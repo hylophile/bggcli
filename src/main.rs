@@ -61,16 +61,32 @@ async fn main() -> Result<()> {
         .build();
     let resp = client.get(url).send().await?.text().await?;
 
-    // dbg!(resp);
-
     let geeklist = from_str::<geeklist::Geeklist>(&resp)?;
-    // dbg!(geeklist);
 
-    geeklist.item.iter().for_each(|it| {
-        // dbg!(&it.object_type);
-        dbg!(&it.subtype);
-        dbg!(it.object_id);
-    });
+    let boardgame_ids = geeklist
+        .item
+        .iter()
+        .map(|it| {
+            let object_type = &it.object_type;
+            let subtype = &it.subtype;
+            let id = it.object_id;
+            assert_eq!(object_type, "thing");
+            assert_eq!(subtype, "boardgame");
+            return (&it.object_name, id);
+        })
+        .collect::<Vec<(&String, u32)>>();
+
+    let mut boardgames: Vec<boardgame::Item> = Vec::with_capacity(boardgame_ids.len());
+
+    for (name, id) in boardgame_ids {
+        // let game_url =
+        //     format!("https://boardgamegeek.com/xmlapi2/{object_type}?type={subtype}&id={id}");
+        // println!("{name}, {id}");
+        let game_url = format!("https://boardgamegeek.com/xmlapi2/thing?type=boardgame&id={id}");
+        let resp = client.get(game_url).send().await?.text().await?;
+        let parsed = from_str::<boardgame::Items>(&resp)?;
+        boardgames.push(parsed.item);
+    }
 
     Ok(())
 }

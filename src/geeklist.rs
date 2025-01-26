@@ -31,7 +31,7 @@ pub struct Item {
     #[serde(rename = "@objectid")]
     pub object_id: u32,
     #[serde(rename = "@objectname")]
-    object_name: String,
+    pub object_name: String,
     #[serde(rename = "@username")]
     username: String,
     #[serde(rename = "@postdate")]

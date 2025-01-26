@@ -5,19 +5,18 @@ use serde::Deserialize;
 pub struct Items {
     #[serde(rename = "@termsofuse")]
     terms_of_use: String,
-    item: Item,
+    pub item: Item,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-struct Item {
+pub struct Item {
     #[serde(rename = "@type")]
     item_type: String,
     #[serde(rename = "@id")]
     id: u32,
     thumbnail: Option<String>,
     image: Option<String>,
-    name: Vec<Name>,
     description: Option<String>,
     yearpublished: Option<ValueField>,
     minplayers: Option<ValueField>,
@@ -26,7 +25,10 @@ struct Item {
     minplaytime: Option<ValueField>,
     maxplaytime: Option<ValueField>,
     minage: Option<ValueField>,
-    poll: Vec<Poll>,
+    #[serde(rename = "name")]
+    pub names: Vec<Name>,
+    #[serde(rename = "poll")]
+    polls: Vec<Poll>,
     #[serde(rename = "link")]
     links: Vec<Link>,
 }
