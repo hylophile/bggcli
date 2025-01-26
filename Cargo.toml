@@ -1,0 +1,9 @@
+[package]
+name = "bggc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quick-xml = { version = "0.37.2", features = ["serialize", "overlapped-lists"] }
+serde = { version = "1.0.217", features = ["derive"] }
+xdg = "2.5.2"
