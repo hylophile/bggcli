@@ -16,20 +16,20 @@ pub struct Geeklist {
     username: String,
     title: String,
     description: String,
-    item: Vec<Item>,
+    pub item: Vec<Item>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-struct Item {
+pub struct Item {
     #[serde(rename = "@id")]
     id: u32,
     #[serde(rename = "@objecttype")]
-    object_type: String,
+    pub object_type: String,
     #[serde(rename = "@subtype")]
-    subtype: String,
+    pub subtype: String,
     #[serde(rename = "@objectid")]
-    object_id: u32,
+    pub object_id: u32,
     #[serde(rename = "@objectname")]
     object_name: String,
     #[serde(rename = "@username")]
