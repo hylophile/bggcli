@@ -12,3 +12,8 @@ reqwest-middleware = "0.4.0"
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
 xdg = "2.5.2"
+serde_rusqlite = "0.37.0"
+rusqlite = "0.33.0"
+# build libsqlite3 as part of the build process
+# uncomment this line if you run into setup issues
+# libsqlite3-sys = { version = "0.30", features = ["bundled"] }

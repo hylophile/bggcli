@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub struct Items {
     #[serde(rename = "@termsofuse")]
@@ -8,13 +8,12 @@ pub struct Items {
     pub item: Item,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Item {
     #[serde(rename = "@type")]
     item_type: String,
     #[serde(rename = "@id")]
-    id: u32,
+    pub id: u32,
     thumbnail: Option<String>,
     image: Option<String>,
     description: Option<String>,
@@ -30,28 +29,63 @@ pub struct Item {
     #[serde(rename = "poll")]
     polls: Vec<Poll>,
     #[serde(rename = "link")]
-    links: Vec<Link>,
+    pub links: Vec<Link>,
 }
 
-#[derive(Debug, Deserialize)]
+impl Item {
+    pub fn primary_name(&self) -> String {
+        for n in &self.names {
+            if n.name_type == "primary" {
+                return n.value.clone();
+            }
+        }
+        panic!("{self:#?}")
+    }
+    pub fn mechanics(&self) -> Vec<Mechanic> {
+        self.links
+            .iter()
+            .filter(|l| l.link_type == "boardgamemechanic")
+            .map(|l| Mechanic {
+                name: l.value.clone(),
+                id: l.id,
+            })
+            .collect()
+    }
+}
+
+pub struct Mechanic {
+    pub name: String,
+    pub id: u32,
+}
+
+pub struct Category {
+    name: String,
+    id: u32,
+}
+pub struct Family {
+    name: String,
+    id: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-struct Name {
+pub struct Name {
     #[serde(rename = "@type")]
     name_type: String,
     #[serde(rename = "@sortindex")]
     sortindex: u32,
     #[serde(rename = "@value")]
-    value: String,
+    pub value: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 struct ValueField {
     #[serde(rename = "@value")]
     value: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 struct Poll {
     #[serde(rename = "@name")]
@@ -63,14 +97,14 @@ struct Poll {
     results: Option<Vec<Results>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 struct Results {
     numplayers: Option<String>,
     result: Vec<Result>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 struct Result {
     #[serde(rename = "@value")]
@@ -81,9 +115,9 @@ struct Result {
     level: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-struct Link {
+pub struct Link {
     #[serde(rename = "@type")]
     link_type: String,
     #[serde(rename = "@id")]

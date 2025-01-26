@@ -3,6 +3,8 @@ use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheO
 use quick_xml::de::from_str;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
+
+use serde_rusqlite::*;
 // use std::fs;
 // use std::io;
 
@@ -88,5 +90,34 @@ async fn main() -> Result<()> {
         boardgames.push(parsed.item);
     }
 
+    let connection = rusqlite::Connection::open("my.db")?;
+    connection.execute_batch(
+        "CREATE TABLE IF NOT EXISTS boardgames (id INT, name TEXT, PRIMARY KEY (id));
+         CREATE TABLE IF NOT EXISTS mechanics  (id INT, name TEXT, PRIMARY KEY (id));        
+         CREATE TABLE IF NOT EXISTS boardgames_mechanics  (boardgame_id INT, mechanic_id INT, PRIMARY KEY (boardgame_id, mechanic_id));        
+        ",
+    )?;
+
+    for b in boardgames {
+        dbg!(b.primary_name());
+        // dbg!(b.mechanics());
+        connection.execute(
+            "INSERT OR REPLACE INTO boardgames (id, name) VALUES (?1, ?2)",
+            (b.id, b.primary_name()),
+        )?;
+        for m in b.mechanics() {
+            connection.execute(
+                "INSERT OR REPLACE INTO mechanics (id, name) VALUES (?1, ?2)",
+                (m.id, m.name),
+            )?;
+            connection.execute(
+                "INSERT OR REPLACE INTO boardgames_mechanics (boardgame_id, mechanic_id) VALUES (?1, ?2)",
+                (b.id,m.id),
+            )?;
+        }
+    }
+
+    // connection.close()?;
+    // and limiting the set of fields that are to be serialized
     Ok(())
 }
