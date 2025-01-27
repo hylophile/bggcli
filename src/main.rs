@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
 
     let pool = SqlitePool::connect("./my.db").await?;
     // let conn = rusqlite::Connection::open("my.db")?;
-    db::init(&pool).await?;
+    // db::init(&pool).await?;
 
     for (name, id) in boardgame_ids {
         // let game_url =

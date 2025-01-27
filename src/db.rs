@@ -1,84 +1,18 @@
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
+use sqlx::{Pool, QueryBuilder, Sqlite};
 // use rusqlite::Connection;
 
-pub async fn init(pool: &Pool<Sqlite>) -> Result<()> {
-    sqlx::query!(
-        "
-CREATE TABLE IF NOT EXISTS item (
-    id INTEGER PRIMARY KEY,
-    item_type TEXT NOT NULL,
-    text TEXT,
-    thumbnail TEXT NOT NULL,
-    image TEXT NOT NULL,
-    description TEXT NOT NULL,
-    yearpublished INTEGER NOT NULL,
-    minplayers INTEGER NOT NULL,
-    maxplayers INTEGER NOT NULL,
-    playingtime INTEGER NOT NULL,
-    minplaytime INTEGER NOT NULL,
-    maxplaytime INTEGER NOT NULL,
-    minage INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS itemname (
-    id INTEGER PRIMARY KEY,
-    item_id INTEGER NOT NULL,
-    name_type TEXT NOT NULL,
-    sortindex TEXT NOT NULL,
-    value TEXT NOT NULL,
-    FOREIGN KEY (item_id) REFERENCES item(id)
-);
-
-CREATE TABLE IF NOT EXISTS poll (
-    id INTEGER PRIMARY KEY,
-    item_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    title TEXT NOT NULL,
-    totalvotes INTEGER NOT NULL,
-    text TEXT,
-    FOREIGN KEY (item_id) REFERENCES item(id)
-);
-
-CREATE TABLE IF NOT EXISTS results (
-    id INTEGER PRIMARY KEY,
-    poll_id INTEGER NOT NULL,
-    numplayers TEXT,
-    text TEXT,
-    FOREIGN KEY (poll_id) REFERENCES poll(id)
-);
-
-CREATE TABLE IF NOT EXISTS resultsresult (
-    id INTEGER PRIMARY KEY,
-    results_id INTEGER NOT NULL,
-    value TEXT NOT NULL,
-    numvotes TEXT NOT NULL,
-    level TEXT,
-    FOREIGN KEY (results_id) REFERENCES results(id)
-);
-
-CREATE TABLE IF NOT EXISTS link (
-    id INTEGER PRIMARY KEY,
-    item_id INTEGER NOT NULL,
-    link_type TEXT NOT NULL,
-    value TEXT NOT NULL,
-    inbound TEXT,
-    FOREIGN KEY (item_id) REFERENCES item(id)
-);
-        ",
-    )
-    .execute(pool)
-    .await?;
-    Ok(())
-}
+// pub async fn init(pool: &Pool<Sqlite>) -> Result<()> {
+//     sqlx::query!("",).execute(pool).await?;
+//     Ok(())
+// }
 
 pub async fn boardgames_insert(
     pool: &Pool<Sqlite>,
     boardgames: Vec<crate::boardgame::Item>,
 ) -> Result<()> {
-    for b in boardgames {
-        sqlx::query!(
-            "
+    let mut item_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "
 INSERT OR REPLACE INTO item (
     id,
     item_type,
@@ -93,25 +27,90 @@ INSERT OR REPLACE INTO item (
     minplaytime,
     maxplaytime,
     minage
-)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ",
-            b.id,
-            b.item_type,
-            b.text,
-            b.thumbnail,
-            b.image,
-            b.description,
-            b.yearpublished.value,
-            b.minplayers.value,
-            b.maxplayers.value,
-            b.playingtime.value,
-            b.minplaytime.value,
-            b.maxplaytime.value,
-            b.minage.value
-        )
-        .execute(pool)
-        .await?;
+) ",
+    );
+    for b in boardgames {
+        dbg!(b.id);
+
+        //         sqlx::query!(
+        //             "
+        // INSERT OR REPLACE INTO item (
+        //     id,
+        //     item_type,
+        //     text,
+        //     thumbnail,
+        //     image,
+        //     description,
+        //     yearpublished,
+        //     minplayers,
+        //     maxplayers,
+        //     playingtime,
+        //     minplaytime,
+        //     maxplaytime,
+        //     minage
+        // )
+        //     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        //     ",
+        item_query_builder
+            .push_bind(b.id)
+            .push_bind(b.item_type)
+            .push_bind(b.text)
+            .push_bind(b.thumbnail)
+            .push_bind(b.image)
+            .push_bind(b.description)
+            .push_bind(b.yearpublished.value)
+            .push_bind(b.minplayers.value)
+            .push_bind(b.maxplayers.value)
+            .push_bind(b.playingtime.value)
+            .push_bind(b.minplaytime.value)
+            .push_bind(b.maxplaytime.value)
+            .push_bind(b.minage.value);
+        // )
+        // .execute(pool)
+        // .await?;
+
+        for l in b.link {
+            sqlx::query!(
+                "
+                INSERT OR REPLACE INTO link (
+                 id,
+                 item_id,
+                 link_type,
+                 value,
+                 inbound   
+                )
+                VALUES (?, ?, ?, ?, ?)
+            ",
+                l.id,
+                b.id,
+                l.link_type,
+                l.value,
+                l.inbound
+            )
+            .execute(pool)
+            .await?;
+        }
+
+        for n in b.name {
+            sqlx::query!(
+                "
+                    INSERT OR REPLACE INTO itemname (
+                        item_id,
+                        name_type,
+                        sortindex,
+                        value
+                    ) 
+                    VALUES (?, ?, ?, ?)
+                ",
+                b.id,
+                n.name_type,
+                n.sortindex,
+                n.value
+            )
+            .execute(pool)
+            .await?;
+        }
+
         //     name: "first name".into(),
         // };
         // connection
@@ -138,5 +137,7 @@ INSERT OR REPLACE INTO item (
         //     )?;
         // }
     }
+    item_query_builder.build().execute(pool).await?;
+
     Ok(())
 }
