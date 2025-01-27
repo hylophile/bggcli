@@ -9,11 +9,12 @@ http-cache-reqwest = "0.15.0"
 quick-xml = { version = "0.37.2", features = ["serialize", "overlapped-lists"] }
 reqwest = "0.12.12"
 reqwest-middleware = "0.4.0"
+# rusqlite = "0.33.0"
 serde = { version = "1.0.217", features = ["derive"] }
+# serde_rusqlite = "0.37.0"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
 xdg = "2.5.2"
-serde_rusqlite = "0.37.0"
-rusqlite = "0.33.0"
 # build libsqlite3 as part of the build process
 # uncomment this line if you run into setup issues
 # libsqlite3-sys = { version = "0.30", features = ["bundled"] }

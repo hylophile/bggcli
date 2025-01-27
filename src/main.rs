@@ -3,39 +3,12 @@ use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheO
 use quick_xml::de::from_str;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
+use sqlx::SqlitePool;
 
-use serde_rusqlite::*;
-// use std::fs;
-// use std::io;
-
+// use serde_rusqlite::*;
 mod boardgame;
+mod db;
 mod geeklist;
-
-// fn main() -> io::Result<()> {
-//     // // Read the XML data from the file
-//     // let filename = "data.xml";
-//     // let filename = "list.xml";
-
-//     // let xml_data = fs::read_to_string(filename)?;
-
-//     // // Parse the XML data
-//     // // match from_str::<boardgame::Items>(&xml_data) {
-//     // //     Ok(items) => {
-//     // //         println!("{:#?}", items);
-//     // //     }
-//     // //     Err(e) => {
-//     // //         eprintln!("Error parsing XML: {}", e);
-//     // //     }
-//     // // }
-//     // match from_str::<geeklist::Geeklist>(&xml_data) {
-//     //     Ok(items) => {
-//     //         println!("{:#?}", items);
-//     //     }
-//     //     Err(e) => {
-//     //         eprintln!("Error parsing XML: {}", e);
-//     //     }
-//     // }
-//     // Ok(())
 
 //     // let config_path = xdg_dirs
 //     //     .place_config_file("config.ini")
@@ -80,68 +53,28 @@ async fn main() -> Result<()> {
 
     let mut boardgames: Vec<boardgame::Item> = Vec::with_capacity(boardgame_ids.len());
 
+    let pool = SqlitePool::connect("./my.db").await?;
+    // let conn = rusqlite::Connection::open("my.db")?;
+    db::init(&pool).await?;
+
     for (name, id) in boardgame_ids {
         // let game_url =
         //     format!("https://boardgamegeek.com/xmlapi2/{object_type}?type={subtype}&id={id}");
         // println!("{name}, {id}");
         let game_url = format!("https://boardgamegeek.com/xmlapi2/thing?type=boardgame&id={id}");
         let resp = client.get(game_url).send().await?.text().await?;
-        let parsed = from_str::<boardgame::Items>(&resp)?;
-        boardgames.push(parsed.item);
-    }
-
-    let connection = rusqlite::Connection::open("my.db")?;
-    connection.execute_batch(
-        "CREATE TABLE IF NOT EXISTS boardgames (id INT, name TEXT, PRIMARY KEY (id));
-         CREATE TABLE IF NOT EXISTS mechanics  (id INT, name TEXT, PRIMARY KEY (id));        
-         CREATE TABLE IF NOT EXISTS boardgames_mechanics  (boardgame_id INT, mechanic_id INT, PRIMARY KEY (boardgame_id, mechanic_id));        
-        ",
-    )?;
-
-    for b in boardgames {
-        dbg!(b.primary_name());
-        // dbg!(b.mechanics());
-        connection.execute(
-            "INSERT OR REPLACE INTO boardgames (id, name) VALUES (?1, ?2)",
-            (b.id, b.primary_name()),
-        )?;
-        for m in b.mechanics() {
-            connection.execute(
-                "INSERT OR REPLACE INTO mechanics (id, name) VALUES (?1, ?2)",
-                (m.id, m.name),
-            )?;
-            connection.execute(
-                "INSERT OR REPLACE INTO boardgames_mechanics (boardgame_id, mechanic_id) VALUES (?1, ?2)",
-                (b.id,m.id),
-            )?;
+        let parsed = from_str::<boardgame::ResponseItems>(&resp)?;
+        // boardgames.push(parsed.item[0].clone());
+        if let Some(item) = parsed.item.get(0) {
+            // item.update()?;
+            // dbg!(item.id);
+            boardgames.push(item.clone())
         }
     }
+
+    db::boardgames_insert(&pool, boardgames).await?;
 
     // connection.close()?;
     // and limiting the set of fields that are to be serialized
     Ok(())
 }
-// SELECT
-//     bg.id AS boardgame_id,
-//     bg.name AS boardgame_name,
-//     m.id AS mechanic_id,
-//     m.name AS mechanic_name
-// FROM
-//     boardgames bg
-// JOIN
-//     boardgames_mechanics bgm ON bg.id = bgm.boardgame_id
-// JOIN
-//     mechanics m ON bgm.mechanic_id = m.id;
-// --------------------------------------------------------------------------------------
-// SELECT
-//     m.id AS mechanic_id,
-//     m.name AS mechanic_name,
-//     COUNT(*) AS occurrence_count
-// FROM
-//     boardgames_mechanics bgm
-// JOIN
-//     mechanics m ON bgm.mechanic_id = m.id
-// GROUP BY
-//     m.id, m.name
-// ORDER BY
-//     occurrence_count DESC;

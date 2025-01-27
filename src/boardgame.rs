@@ -1,129 +1,185 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub struct Items {
+// impl Item {
+//     pub fn primary_name(&self) -> String {
+//         for n in &self.names {
+//             if n.name_type == "primary" {
+//                 return n.value.clone();
+//             }
+//         }
+//         panic!("{self:#?}")
+//     }
+//     pub fn mechanics(&self) -> Vec<Mechanic> {
+//         self.link
+//             .iter()
+//             .filter(|l| l.link_type == "boardgamemechanic")
+//             .map(|l| Mechanic {
+//                 name: l.value.clone(),
+//                 id: l.id,
+//             })
+//             .collect()
+//     }
+// }
+
+// pub struct Mechanic {
+//     pub name: String,
+//     pub id: i64,
+// }
+
+// pub struct Category {
+//     name: String,
+//     id: i64,
+// }
+// pub struct Family {
+//     name: String,
+//     id: i64,
+// }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ResponseItems {
     #[serde(rename = "@termsofuse")]
-    terms_of_use: String,
-    pub item: Item,
+    pub termsofuse: String,
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub item: Vec<Item>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Item {
     #[serde(rename = "@type")]
-    item_type: String,
+    pub item_type: String,
     #[serde(rename = "@id")]
-    pub id: u32,
-    thumbnail: Option<String>,
-    image: Option<String>,
-    description: Option<String>,
-    yearpublished: Option<ValueField>,
-    minplayers: Option<ValueField>,
-    maxplayers: Option<ValueField>,
-    playingtime: Option<ValueField>,
-    minplaytime: Option<ValueField>,
-    maxplaytime: Option<ValueField>,
-    minage: Option<ValueField>,
-    #[serde(rename = "name")]
-    pub names: Vec<Name>,
-    #[serde(rename = "poll")]
-    polls: Vec<Poll>,
-    #[serde(rename = "link")]
-    pub links: Vec<Link>,
+    pub id: i64,
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub thumbnail: String,
+    pub image: String,
+    pub name: Vec<Name>,
+    pub description: String,
+    pub yearpublished: Yearpublished,
+    pub minplayers: Minplayers,
+    pub maxplayers: Maxplayers,
+    #[serde(rename = "poll-summary")]
+    pub poll_summary: PollSummary,
+    pub playingtime: Playingtime,
+    pub minplaytime: Minplaytime,
+    pub maxplaytime: Maxplaytime,
+    pub minage: Minage,
+    pub poll: Vec<Poll>,
+    pub link: Vec<Link>,
 }
 
-impl Item {
-    pub fn primary_name(&self) -> String {
-        for n in &self.names {
-            if n.name_type == "primary" {
-                return n.value.clone();
-            }
-        }
-        panic!("{self:#?}")
-    }
-    pub fn mechanics(&self) -> Vec<Mechanic> {
-        self.links
-            .iter()
-            .filter(|l| l.link_type == "boardgamemechanic")
-            .map(|l| Mechanic {
-                name: l.value.clone(),
-                id: l.id,
-            })
-            .collect()
-    }
-}
-
-pub struct Mechanic {
-    pub name: String,
-    pub id: u32,
-}
-
-pub struct Category {
-    name: String,
-    id: u32,
-}
-pub struct Family {
-    name: String,
-    id: u32,
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Name {
     #[serde(rename = "@type")]
-    name_type: String,
+    pub name_type: String,
     #[serde(rename = "@sortindex")]
-    sortindex: u32,
+    pub sortindex: String,
     #[serde(rename = "@value")]
     pub value: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-struct ValueField {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Yearpublished {
     #[serde(rename = "@value")]
-    value: String,
+    pub value: i64,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-struct Poll {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Minplayers {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Maxplayers {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PollSummary {
     #[serde(rename = "@name")]
-    name: String,
+    pub name: String,
     #[serde(rename = "@title")]
-    title: String,
-    #[serde(rename = "@totalvotes")]
-    totalvotes: u32,
-    results: Option<Vec<Results>>,
+    pub title: String,
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub result: Vec<PollSummaryResult>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-struct Results {
-    numplayers: Option<String>,
-    result: Vec<Result>,
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-struct Result {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PollSummaryResult {
+    #[serde(rename = "@name")]
+    pub name: String,
     #[serde(rename = "@value")]
-    value: String,
-    #[serde(rename = "@numvotes")]
-    numvotes: u32,
-    #[serde(rename = "level")]
-    level: Option<u32>,
+    pub value: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Playingtime {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Minplaytime {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Maxplaytime {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Minage {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Poll {
+    #[serde(rename = "@name")]
+    pub name: String,
+    #[serde(rename = "@title")]
+    pub title: String,
+    #[serde(rename = "@totalvotes")]
+    pub totalvotes: i64,
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub results: Vec<Results>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Results {
+    #[serde(rename = "@numplayers")]
+    pub numplayers: Option<String>,
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub result: Vec<ResultsResult>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ResultsResult {
+    #[serde(rename = "@value")]
+    pub value: String,
+    #[serde(rename = "@numvotes")]
+    pub numvotes: String,
+    #[serde(rename = "@level")]
+    pub level: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Link {
     #[serde(rename = "@type")]
-    link_type: String,
+    pub link_type: String,
     #[serde(rename = "@id")]
-    id: u32,
+    pub id: i64,
     #[serde(rename = "@value")]
-    value: String,
-    #[serde(default)]
-    inbound: bool,
+    pub value: String,
+    #[serde(rename = "@inbound")]
+    pub inbound: Option<String>,
 }
