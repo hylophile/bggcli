@@ -121,3 +121,27 @@ async fn main() -> Result<()> {
     // and limiting the set of fields that are to be serialized
     Ok(())
 }
+// SELECT
+//     bg.id AS boardgame_id,
+//     bg.name AS boardgame_name,
+//     m.id AS mechanic_id,
+//     m.name AS mechanic_name
+// FROM
+//     boardgames bg
+// JOIN
+//     boardgames_mechanics bgm ON bg.id = bgm.boardgame_id
+// JOIN
+//     mechanics m ON bgm.mechanic_id = m.id;
+// --------------------------------------------------------------------------------------
+// SELECT
+//     m.id AS mechanic_id,
+//     m.name AS mechanic_name,
+//     COUNT(*) AS occurrence_count
+// FROM
+//     boardgames_mechanics bgm
+// JOIN
+//     mechanics m ON bgm.mechanic_id = m.id
+// GROUP BY
+//     m.id, m.name
+// ORDER BY
+//     occurrence_count DESC;
