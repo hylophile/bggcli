@@ -74,5 +74,49 @@ inner join link
 on link.item_id == item.id 
 order by item.id;
 
-        
+create view if not exists itemmechanic as
+select item_link.item_id, group_concat(link.value, ', ') as value from item_link
+join link on link.id == item_link.link_id 
+where link.link_type="boardgamemechanic"
+group by item_link.item_id;
+
+create view if not exists itemfamily as
+select item_link.item_id, group_concat(link.value, ', ') as value from item_link
+join link on link.id == item_link.link_id 
+where link.link_type="boardgamefamily"
+group by item_link.item_id;
+
+create view if not exists itemcategory as
+select item_link.item_id, group_concat(link.value, ', ') as value from item_link
+join link on link.id == item_link.link_id 
+where link.link_type="boardgamecategory"
+group by item_link.item_id;
+
+
+-- todo
+create view if not exists boardgame as
+select
+    item.id,
+    itemname.value as name,
+    item.description,
+    item.yearpublished,
+    item.minplayers,
+    item.maxplayers,
+    item.playingtime,
+    item.minplaytime,
+    item.maxplaytime,
+    item.minage,
+    itemmechanic.value as mechanics,
+    itemfamily.value as families,
+    itemcategory.value as categories
+from item
+left outer join itemname on item.id == itemname.item_id 
+left outer join itemmechanic on item.id = itemmechanic.item_id
+left outer join itemfamily on item.id = itemfamily.item_id
+left outer join itemcategory on item.id = itemcategory.item_id
+where itemname.name_type == "primary";
+
+--join item_link on link.id == item_link.link_id 
+--join item on item_link.item_id == item.id         
+
 -- select link.value from link where link.link_type = "boardgamemechanic"
