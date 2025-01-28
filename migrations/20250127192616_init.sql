@@ -54,13 +54,18 @@ CREATE TABLE IF NOT EXISTS resultsresult (
 
 CREATE TABLE IF NOT EXISTS link (
     id INTEGER PRIMARY KEY,
-    item_id INTEGER NOT NULL,
     link_type TEXT NOT NULL,
     value TEXT NOT NULL,
-    inbound TEXT,
-    FOREIGN KEY (item_id) REFERENCES item(id)
+    inbound TEXT
 );
 
+CREATE TABLE if not exists item_link (
+    item_id integer,
+    link_id integer,
+    primary key (item_id, link_id),
+    foreign key (item_id) references item(id),
+    foreign key (link_id) references link(id)
+);
 
 create view if not exists testing 
 as 
@@ -70,3 +75,4 @@ on link.item_id == item.id
 order by item.id;
 
         
+-- select link.value from link where link.link_type = "boardgamemechanic"

@@ -33,15 +33,21 @@ pub async fn boardgames_insert(
     let mut link_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
         "INSERT OR REPLACE INTO link (
                    id,
-                   item_id,
                    link_type,
                    value,
                    inbound   
                ) VALUES ",
     );
+    let mut item_link_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "INSERT OR REPLACE INTO item_link (
+                   item_id,
+                   link_id
+               ) VALUES ",
+    );
 
     // TODO: feels very dumb, but it works
     let mut is_first_link = true;
+    let mut is_first_item_link = true;
     let mut is_first_itemname = true;
 
     item_query_builder.push_values(boardgames, |mut item_qb, item| {
@@ -69,12 +75,20 @@ pub async fn boardgames_insert(
             let mut separated = link_query_builder.separated(", ");
             separated
                 .push_bind(link.id)
-                .push_bind(item.id)
                 .push_bind(link.link_type.clone())
                 .push_bind(link.value.clone())
                 .push_bind(link.inbound.clone());
             separated.push_unseparated(")");
             is_first_link = false;
+
+            if !is_first_item_link {
+                item_link_query_builder.push(", ");
+            }
+            item_link_query_builder.push("(");
+            let mut separated = item_link_query_builder.separated(", ");
+            separated.push_bind(item.id).push_bind(link.id);
+            separated.push_unseparated(")");
+            is_first_item_link = false;
         }
 
         for name in item.name.iter() {
@@ -96,6 +110,8 @@ pub async fn boardgames_insert(
     let q = item_query_builder.build();
     q.execute(pool).await?;
     let q = link_query_builder.build();
+    q.execute(pool).await?;
+    let q = item_link_query_builder.build();
     q.execute(pool).await?;
     let q = itemname_query_builder.build();
     q.execute(pool).await?;
