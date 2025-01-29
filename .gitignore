@@ -1,2 +1,5 @@
 /target
 http-cacache
+*.xml
+my.db
+todo.md
