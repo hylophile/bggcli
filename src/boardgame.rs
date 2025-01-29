@@ -1,44 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-// impl Item {
-//     pub fn primary_name(&self) -> String {
-//         for n in &self.names {
-//             if n.name_type == "primary" {
-//                 return n.value.clone();
-//             }
-//         }
-//         panic!("{self:#?}")
-//     }
-//     pub fn mechanics(&self) -> Vec<Mechanic> {
-//         self.link
-//             .iter()
-//             .filter(|l| l.link_type == "boardgamemechanic")
-//             .map(|l| Mechanic {
-//                 name: l.value.clone(),
-//                 id: l.id,
-//             })
-//             .collect()
-//     }
-// }
-
-// pub struct Mechanic {
-//     pub name: String,
-//     pub id: i64,
-// }
-
-// pub struct Category {
-//     name: String,
-//     id: i64,
-// }
-// pub struct Family {
-//     name: String,
-//     id: i64,
-// }
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ResponseItems {
     #[serde(rename = "@termsofuse")]
-    pub termsofuse: String,
+    pub termsofuse: Option<String>,
     #[serde(rename = "$text")]
     pub text: Option<String>,
     pub item: Vec<Item>,
@@ -67,6 +32,7 @@ pub struct Item {
     pub minage: Minage,
     pub poll: Vec<Poll>,
     pub link: Vec<Link>,
+    pub statistics: Statistics,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -182,4 +148,127 @@ pub struct Link {
     pub value: String,
     #[serde(rename = "@inbound")]
     pub inbound: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Statistics {
+    #[serde(rename = "@page")]
+    pub page: i64,
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub ratings: Ratings,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Ratings {
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub usersrated: Usersrated,
+    pub average: Average,
+    pub bayesaverage: Bayesaverage,
+    pub ranks: Ranks,
+    pub stddev: Stddev,
+    pub median: Median,
+    pub owned: Owned,
+    pub trading: Trading,
+    pub wanting: Wanting,
+    pub wishing: Wishing,
+    pub numcomments: Numcomments,
+    pub numweights: Numweights,
+    pub averageweight: Averageweight,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Usersrated {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Average {
+    #[serde(rename = "@value")]
+    pub value: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Bayesaverage {
+    #[serde(rename = "@value")]
+    pub value: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Ranks {
+    #[serde(rename = "$text")]
+    pub text: Option<String>,
+    pub rank: Vec<Rank>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Rank {
+    #[serde(rename = "@type")]
+    pub rank_type: String,
+    #[serde(rename = "@id")]
+    pub id: i64,
+    #[serde(rename = "@name")]
+    pub name: String,
+    #[serde(rename = "@friendlyname")]
+    pub friendlyname: String,
+    #[serde(rename = "@value")]
+    pub value: String, // "Not Ranked" or i64
+    #[serde(rename = "@bayesaverage")]
+    pub bayesaverage: String, // "Not Ranked" or f64
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Stddev {
+    #[serde(rename = "@value")]
+    pub value: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Median {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Owned {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Trading {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Wanting {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Wishing {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Numcomments {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Numweights {
+    #[serde(rename = "@value")]
+    pub value: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Averageweight {
+    #[serde(rename = "@value")]
+    pub value: f64,
 }

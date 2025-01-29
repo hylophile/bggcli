@@ -66,6 +66,8 @@ pub async fn boardgames_insert(
             .push_bind(item.maxplaytime.value)
             .push_bind(item.minage.value);
 
+        // TODO: add ranks
+
         // TODO: manually building sql queries, in this day and age? well, it works
         for link in item.link.iter() {
             if !is_first_link {

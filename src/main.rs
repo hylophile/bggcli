@@ -61,13 +61,13 @@ async fn main() -> Result<()> {
         // let game_url =
         //     format!("https://boardgamegeek.com/xmlapi2/{object_type}?type={subtype}&id={id}");
         // println!("{name}, {id}");
-        let game_url = format!("https://boardgamegeek.com/xmlapi2/thing?type=boardgame&id={id}");
+        dbg!(name, id);
+        let game_url = format!("https://boardgamegeek.com/xmlapi2/thing?id={id}&stats=1");
         let resp = client.get(game_url).send().await?.text().await?;
         let parsed = from_str::<boardgame::ResponseItems>(&resp)?;
         // boardgames.push(parsed.item[0].clone());
         if let Some(item) = parsed.item.get(0) {
             // item.update()?;
-            // dbg!(item.id);
             boardgames.push(item.clone())
         }
     }
