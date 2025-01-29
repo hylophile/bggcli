@@ -2,6 +2,10 @@
 name = "bggcli"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A CLI to interact with BoardGameGeek's API"
+repository = "https://github.com/hylophile/bggcli/"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.95"
