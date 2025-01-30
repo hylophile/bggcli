@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use anyhow::Result;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use quick_xml::de::from_str;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
@@ -30,11 +30,20 @@ mod geeklist;
 #[tokio::main]
 async fn main() -> Result<()> {
     let url = "https://boardgamegeek.com/xmlapi2/geeklist/303652/more-games-playable-with-the-everdeck?itemid=9184614";
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
+    let http_cache_dir = xdg_dirs.create_cache_directory("http-cache")?;
+    let db_file = {
+        let mut data_dir = xdg_dirs.get_data_home();
+        data_dir.push("default.db");
+        data_dir
+    };
     let client = ClientBuilder::new(Client::new())
         .with(Cache(HttpCache {
             mode: CacheMode::ForceCache, // prefer local version TODO: make configurable
             // mode: CacheMode::Default,
-            manager: CACacheManager::default(),
+            manager: CACacheManager {
+                path: http_cache_dir,
+            },
             options: HttpCacheOptions::default(),
         }))
         .build();
@@ -61,9 +70,9 @@ async fn main() -> Result<()> {
     // let conn = rusqlite::Connection::open("my.db")?;
     // db::init(&pool).await?;
 
-    let pb = ProgressBar::new(boardgame_ids.len() as u64);
-    pb.set_style(
-        ProgressStyle::with_template("{elapsed} [{bar:40}] {percent}% {msg}")
+    let progress_bar_fetch = ProgressBar::new(boardgame_ids.len() as u64);
+    progress_bar_fetch.set_style(
+        ProgressStyle::with_template("{elapsed:>4} [{bar:40}] {percent}% {msg}")
             .unwrap()
             .progress_chars("-Co"),
     );
@@ -85,14 +94,15 @@ async fn main() -> Result<()> {
 
             if resp.status() != reqwest::StatusCode::OK {
                 if resp.status() == reqwest::StatusCode::ACCEPTED {
-                    pb.set_message(format!(
+                    progress_bar_fetch.set_message(format!(
                         "TODO was requested from BGG. Retrying in {delay} seconds."
                     ));
                     sleep(Duration::from_secs(delay)).await;
                     delay *= 2;
                     continue;
                 } else {
-                    pb.set_message(format!("Failed. Reason: Status {}", resp.status(),));
+                    progress_bar_fetch
+                        .set_message(format!("Failed. Reason: Status {}", resp.status(),));
                 }
             }
 
@@ -105,14 +115,14 @@ async fn main() -> Result<()> {
                     {
                         resp_was_cached = x_cache == "HIT" && x_cache_lookup == "HIT"
                     }
-                    pb.inc(parsed.item.len() as u64);
+                    progress_bar_fetch.inc(parsed.item.len() as u64);
                     for item in parsed.item {
                         boardgames.push(item.clone());
                     }
                     break;
                 }
                 Err(e) => {
-                    pb.set_message(format!(
+                    progress_bar_fetch.set_message(format!(
                         "Parsing failed. Retrying in {delay} seconds. Reason: {e}\n{resp_text}"
                     ));
                     sleep(Duration::from_secs(delay)).await;
@@ -123,9 +133,8 @@ async fn main() -> Result<()> {
         if !resp_was_cached {
             sleep(Duration::from_secs(1)).await;
         }
-        sleep(Duration::from_secs(1)).await;
     }
-    pb.finish();
+    progress_bar_fetch.finish();
 
     println!("Adding {} items to database...", boardgame_ids.len());
     db::boardgames_insert(&pool, boardgames).await?;
