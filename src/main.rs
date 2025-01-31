@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use boardgame::Item;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
@@ -8,12 +10,46 @@ use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use tokio::time::{sleep, Duration};
 
+use clap::{Parser, Subcommand};
+
 mod boardgame;
 mod db;
 mod geeklist;
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Optional name to operate on
+    // name: Option<String>,
+
+    /// Sets a custom config file
+    // #[arg(short, long, value_name = "FILE")]
+    // config: Option<PathBuf>,
+
+    /// Turn debugging information on
+    // #[arg(short, long, action = clap::ArgAction::Count)]
+    // debug: u8,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// adds items to the database
+    Add {
+        /// lists test values
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        list: bool,
+    },
+    /// queries the database for items
+    Query {},
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    // dbg!(cli);
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
     let http_cache_dir = xdg_dirs.create_cache_directory("http-cache")?;
     let db_file = xdg_dirs.place_data_file("default.db")?;

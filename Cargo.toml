@@ -9,6 +9,7 @@ readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.95"
+clap = { version = "4.5.27", features = ["derive"] }
 http-cache-reqwest = "0.15.0"
 indicatif = { version = "0.17.11", features = ["tokio"] }
 quick-xml = { version = "0.37.2", features = ["serialize", "overlapped-lists"] }
