@@ -6,7 +6,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use quick_xml::de::from_str;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
-use sqlx::SqlitePool;
+use sqlx::{migrate, sqlite::SqliteConnectOptions, SqlitePool};
 use tokio::time::{sleep, Duration};
 
 // use serde_rusqlite::*;
@@ -32,11 +32,12 @@ async fn main() -> Result<()> {
     let url = "https://boardgamegeek.com/xmlapi2/geeklist/303652/more-games-playable-with-the-everdeck?itemid=9184614";
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
     let http_cache_dir = xdg_dirs.create_cache_directory("http-cache")?;
-    let db_file = {
-        let mut data_dir = xdg_dirs.get_data_home();
-        data_dir.push("default.db");
-        data_dir
-    };
+    // let db_file = {
+    //     let mut data_dir = xdg_dirs.get_data_home();
+    //     data_dir.push("default.db");
+    //     data_dir
+    // };
+    // let db
     let client = ClientBuilder::new(Client::new())
         .with(Cache(HttpCache {
             mode: CacheMode::ForceCache, // prefer local version TODO: make configurable
@@ -66,8 +67,19 @@ async fn main() -> Result<()> {
 
     let mut boardgames: Vec<boardgame::Item> = Vec::with_capacity(boardgame_ids.len());
 
-    let pool = SqlitePool::connect("./my.db").await?;
+    // migrate!("migrations");
+    let db_file = xdg_dirs.place_data_file("default.db")?;
+
+    // std::fs::OpenOptions::new().create(db_file);
+
+    let pool = SqlitePool::connect_with(
+        SqliteConnectOptions::new()
+            .filename(db_file.to_str().expect("unknown error"))
+            .create_if_missing(true),
+    )
+    .await?;
     // let conn = rusqlite::Connection::open("my.db")?;
+    sqlx::migrate!().run(&pool).await?;
     // db::init(&pool).await?;
 
     let progress_bar_fetch = ProgressBar::new(boardgame_ids.len() as u64);
