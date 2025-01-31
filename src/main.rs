@@ -1,43 +1,30 @@
-use std::fmt::Debug;
-
 use anyhow::Result;
+use boardgame::Item;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use indicatif::{ProgressBar, ProgressStyle};
 use quick_xml::de::from_str;
 use reqwest::Client;
-use reqwest_middleware::ClientBuilder;
-use sqlx::{migrate, sqlite::SqliteConnectOptions, SqlitePool};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use tokio::time::{sleep, Duration};
 
-// use serde_rusqlite::*;
 mod boardgame;
 mod db;
 mod geeklist;
 
-//     // let config_path = xdg_dirs
-//     //     .place_config_file("config.ini")
-//     //     .expect("cannot create configuration directory");
-//     // let cache_dir = xdg_dirs.get_cache_home();
-//     // dbg!(boardgame_cache_dir);
-//     // let mut config_file = File::create(config_path)?;
-//     // write!(&mut config_file, "configured = 1")?;
-//     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
-
-//     let boardgame_cache_dir = xdg_dirs.create_cache_directory("boardgames")?;
-//     Ok(())
-// }
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let url = "https://boardgamegeek.com/xmlapi2/geeklist/303652/more-games-playable-with-the-everdeck?itemid=9184614";
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
     let http_cache_dir = xdg_dirs.create_cache_directory("http-cache")?;
-    // let db_file = {
-    //     let mut data_dir = xdg_dirs.get_data_home();
-    //     data_dir.push("default.db");
-    //     data_dir
-    // };
-    // let db
+    let db_file = xdg_dirs.place_data_file("default.db")?;
+    let pool = SqlitePool::connect_with(
+        SqliteConnectOptions::new()
+            .filename(db_file.to_str().expect("unknown error"))
+            .create_if_missing(true),
+    )
+    .await?;
+    sqlx::migrate!().run(&pool).await?;
+
     let client = ClientBuilder::new(Client::new())
         .with(Cache(HttpCache {
             mode: CacheMode::ForceCache, // prefer local version TODO: make configurable
@@ -48,6 +35,15 @@ async fn main() -> Result<()> {
             options: HttpCacheOptions::default(),
         }))
         .build();
+
+    let url = "https://boardgamegeek.com/xmlapi2/geeklist/303652/more-games-playable-with-the-everdeck?itemid=9184614";
+    let boardgames = fetch_geeklist(client, url).await?;
+    println!("Adding {} items to database...", boardgames.len());
+    db::boardgames_insert(&pool, boardgames).await?;
+    Ok(())
+}
+
+async fn fetch_geeklist(client: ClientWithMiddleware, url: &str) -> Result<Vec<Item>> {
     let resp = client.get(url).send().await?.text().await?;
 
     let geeklist = from_str::<geeklist::Geeklist>(&resp)?;
@@ -66,21 +62,6 @@ async fn main() -> Result<()> {
         .collect::<Vec<(&String, u32)>>();
 
     let mut boardgames: Vec<boardgame::Item> = Vec::with_capacity(boardgame_ids.len());
-
-    // migrate!("migrations");
-    let db_file = xdg_dirs.place_data_file("default.db")?;
-
-    // std::fs::OpenOptions::new().create(db_file);
-
-    let pool = SqlitePool::connect_with(
-        SqliteConnectOptions::new()
-            .filename(db_file.to_str().expect("unknown error"))
-            .create_if_missing(true),
-    )
-    .await?;
-    // let conn = rusqlite::Connection::open("my.db")?;
-    sqlx::migrate!().run(&pool).await?;
-    // db::init(&pool).await?;
 
     let progress_bar_fetch = ProgressBar::new(boardgame_ids.len() as u64);
     progress_bar_fetch.set_style(
@@ -148,10 +129,5 @@ async fn main() -> Result<()> {
     }
     progress_bar_fetch.finish();
 
-    println!("Adding {} items to database...", boardgame_ids.len());
-    db::boardgames_insert(&pool, boardgames).await?;
-
-    // connection.close()?;
-    // and limiting the set of fields that are to be serialized
-    Ok(())
+    return Ok(boardgames);
 }
