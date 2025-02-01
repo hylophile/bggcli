@@ -5,10 +5,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 use quick_xml::de::from_str;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
+use sqlx::{prelude::FromRow, sqlite::SqliteConnectOptions, QueryBuilder, Row, Sqlite, SqlitePool};
 use tokio::time::{sleep, Duration};
 
 use clap::{Parser, Subcommand};
+use futures::TryStreamExt;
 
 mod boardgame;
 mod db;
@@ -50,6 +51,14 @@ enum Commands {
     },
 }
 
+#[derive(FromRow)]
+struct Bleh {
+    #[sqlx(default)]
+    id: Option<i64>,
+    #[sqlx(default)]
+    name: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
@@ -75,7 +84,6 @@ async fn main() -> Result<()> {
         .build();
 
     let cli = Cli::parse();
-
     match cli.command {
         Commands::Add { url } => {
             let (url_type, id) = parse_bgg_url(&url)?;
@@ -84,7 +92,27 @@ async fn main() -> Result<()> {
             println!("Adding {} items to database...", boardgames.len());
             db::boardgames_insert(&pool, boardgames).await?;
         }
-        Commands::Query { r#where, columns } => todo!(),
+        Commands::Query { r#where, columns } => {
+            let filter = r#where.unwrap_or("mechanics like '%trick-taking%'".to_string());
+            // let mut rows = sqlx::query("select name from boardgame limit 10").fetch(&pool);
+
+            // while let Some(row) = rows.try_next().await? {
+            //     // map the row into a user-defined domain type
+            //     let name: &str = row.try_get("name")?;
+            //     println!("{name}");
+            // }
+
+            let mut qb: QueryBuilder<Sqlite> =
+                QueryBuilder::new("select name from boardgame where ");
+            qb.push(filter);
+            let q = qb.build_query_as::<Bleh>();
+            let mut r = q.fetch(&pool);
+
+            while let Some(row) = r.try_next().await? {
+                let x = row.name.unwrap_or("???".into());
+                println!("{x:?}");
+            }
+        }
     };
 
     Ok(())
