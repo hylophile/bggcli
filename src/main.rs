@@ -49,6 +49,18 @@ enum Commands {
         #[arg(short, long)]
         columns: Option<String>,
     },
+    Db {
+        #[command(subcommand)]
+        subcommand: DbCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum DbCommands {
+    /// deletes the database
+    Clear,
+    /// prints the database path
+    Path,
 }
 
 #[derive(FromRow)]
@@ -93,26 +105,27 @@ async fn main() -> Result<()> {
             db::boardgames_insert(&pool, boardgames).await?;
         }
         Commands::Query { r#where, columns } => {
-            let filter = r#where.unwrap_or("mechanics like '%trick-taking%'".to_string());
-            // let mut rows = sqlx::query("select name from boardgame limit 10").fetch(&pool);
-
-            // while let Some(row) = rows.try_next().await? {
-            //     // map the row into a user-defined domain type
-            //     let name: &str = row.try_get("name")?;
-            //     println!("{name}");
-            // }
-
+            let filter = r#where.unwrap_or("true".to_string());
             let mut qb: QueryBuilder<Sqlite> =
                 QueryBuilder::new("select name from boardgame where ");
             qb.push(filter);
             let q = qb.build_query_as::<Bleh>();
-            let mut r = q.fetch(&pool);
+            let mut rows = q.fetch(&pool);
 
-            while let Some(row) = r.try_next().await? {
-                let x = row.name.unwrap_or("???".into());
-                println!("{x:?}");
+            while let Some(row) = rows.try_next().await? {
+                let name = row.name.unwrap_or("???".into());
+                println!("{}", name);
             }
         }
+        Commands::Db { subcommand } => match subcommand {
+            DbCommands::Clear => {
+                std::fs::remove_file(&db_file)?;
+                println!("Deleted database at {}", db_file.display());
+            }
+            DbCommands::Path => {
+                println!("{}", db_file.display());
+            }
+        },
     };
 
     Ok(())
