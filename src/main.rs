@@ -1,6 +1,4 @@
-use std::path::PathBuf;
-
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use boardgame::Item;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -38,18 +36,22 @@ struct Cli {
 enum Commands {
     /// adds items to the database
     Add {
-        /// lists test values
-        #[arg(short, long, action = clap::ArgAction::Count)]
-        list: bool,
+        /// URL to add
+        url: String,
     },
-    /// queries the database for items
-    Query {},
+    /// queries the database for items (SQL syntax)
+    Query {
+        /// add a WHERE-clause (Filter the results)
+        #[arg(short, long)]
+        r#where: Option<String>,
+        /// declare which columns to show
+        #[arg(short, long)]
+        columns: Option<String>,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::parse();
-    // dbg!(cli);
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
     let http_cache_dir = xdg_dirs.create_cache_directory("http-cache")?;
     let db_file = xdg_dirs.place_data_file("default.db")?;
@@ -72,11 +74,50 @@ async fn main() -> Result<()> {
         }))
         .build();
 
-    let url = "https://boardgamegeek.com/xmlapi2/geeklist/303652/more-games-playable-with-the-everdeck?itemid=9184614";
-    let boardgames = fetch_geeklist(client, url).await?;
-    println!("Adding {} items to database...", boardgames.len());
-    db::boardgames_insert(&pool, boardgames).await?;
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Add { url } => {
+            let (url_type, id) = parse_bgg_url(&url)?;
+            let url_api = format!("https://boardgamegeek.com/xmlapi2/{url_type}/{id}/");
+            let boardgames = fetch_geeklist(client, &url_api).await?;
+            println!("Adding {} items to database...", boardgames.len());
+            db::boardgames_insert(&pool, boardgames).await?;
+        }
+        Commands::Query { r#where, columns } => todo!(),
+    };
+
     Ok(())
+}
+
+// const SUPPORTED_TYPES: &[&str] = &["geeklist", "boardgame", "expansion", "family"];
+const SUPPORTED_TYPES: &[&str] = &["geeklist"];
+
+fn parse_bgg_url(url: &str) -> Result<(String, String)> {
+    if !url.starts_with("https://boardgamegeek.com/") {
+        return Err(anyhow!(
+            "Invalid domain: Only 'boardgamegeek.com' URLs are supported"
+        ));
+    }
+
+    let path = url.trim_start_matches("https://boardgamegeek.com/");
+    let mut parts = path.split('/');
+    if let (Some(type_part), Some(id_part)) = (parts.next(), parts.next()) {
+        if !SUPPORTED_TYPES.contains(&type_part) {
+            return Err(anyhow!(
+                "Unsupported type '{}'. Supported types: {:?}",
+                type_part,
+                SUPPORTED_TYPES
+            ));
+        }
+        if id_part.chars().all(char::is_numeric) {
+            return Ok((type_part.to_string(), id_part.to_string()));
+        }
+    }
+
+    Err(anyhow!(
+        "Invalid URL format: Expected format is 'https://boardgamegeek.com/{{type}}/{{id}}/...'"
+    ))
 }
 
 async fn fetch_geeklist(client: ClientWithMiddleware, url: &str) -> Result<Vec<Item>> {
