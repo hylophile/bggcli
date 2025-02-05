@@ -7,19 +7,31 @@ pub async fn boardgames_insert(
 ) -> Result<()> {
     let mut item_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
         "INSERT OR REPLACE INTO item (
-                   id,
-                   item_type,
-                   text,
-                   thumbnail,
-                   image,
-                   description,
-                   yearpublished,
-                   minplayers,
-                   maxplayers,
-                   playingtime,
-                   minplaytime,
-                   maxplaytime,
-                   minage
+                    id,
+                    item_type,
+                    text,
+                    thumbnail,
+                    image,
+                    description,
+                    yearpublished,
+                    minplayers,
+                    maxplayers,
+                    playingtime,
+                    minplaytime,
+                    maxplaytime,
+                    minage,
+                    usersrated, 
+                    average, 
+                    bayesaverage, 
+                    stddev, 
+                    median, 
+                    owned, 
+                    trading, 
+                    wanting, 
+                    wishing, 
+                    numcomments, 
+                    numweights, 
+                    averageweight
                ) ",
     );
     let mut itemname_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
@@ -51,6 +63,7 @@ pub async fn boardgames_insert(
     let mut is_first_itemname = true;
 
     item_query_builder.push_values(boardgames, |mut item_qb, item| {
+        let stats = item.statistics.ratings;
         item_qb
             .push_bind(item.id)
             .push_bind(item.item_type)
@@ -64,7 +77,19 @@ pub async fn boardgames_insert(
             .push_bind(item.playingtime.value)
             .push_bind(item.minplaytime.value)
             .push_bind(item.maxplaytime.value)
-            .push_bind(item.minage.value);
+            .push_bind(item.minage.value)
+            .push_bind(stats.usersrated.value)
+            .push_bind(stats.average.value)
+            .push_bind(stats.bayesaverage.value)
+            .push_bind(stats.stddev.value)
+            .push_bind(stats.median.value)
+            .push_bind(stats.owned.value)
+            .push_bind(stats.trading.value)
+            .push_bind(stats.wanting.value)
+            .push_bind(stats.wishing.value)
+            .push_bind(stats.numcomments.value)
+            .push_bind(stats.numweights.value)
+            .push_bind(stats.averageweight.value);
 
         // TODO: add ranks
 

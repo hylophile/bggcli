@@ -13,7 +13,19 @@ CREATE TABLE IF NOT EXISTS item (
     playingtime INTEGER NOT NULL,
     minplaytime INTEGER NOT NULL,
     maxplaytime INTEGER NOT NULL,
-    minage INTEGER NOT NULL
+    minage INTEGER NOT NULL,
+    usersrated INTEGER NOT NULL,
+    average REAL NOT NULL,
+    bayesaverage REAL NOT NULL,
+    stddev REAL NOT NULL,
+    median INTEGER NOT NULL,
+    owned INTEGER NOT NULL,
+    trading INTEGER NOT NULL,
+    wanting INTEGER NOT NULL,
+    wishing INTEGER NOT NULL,
+    numcomments INTEGER NOT NULL,
+    numweights INTEGER NOT NULL,
+    averageweight REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS itemname (
@@ -67,12 +79,23 @@ CREATE TABLE if not exists item_link (
     foreign key (link_id) references link(id)
 );
 
-create view if not exists testing 
-as 
-select * from item 
-inner join link 
-on link.item_id == item.id 
-order by item.id;
+create table if not exists rank (
+    id integer,
+    rank_type text not null,
+    name text not null,  
+    friendlyname text not null,
+    primary key (id)
+);
+
+create table if not exists item_rank (
+    item_id integer,
+    rank_id integer,
+    value integer,
+    bayesavagerage real,
+    primary key (item_id, rank_id),  
+    foreign key (item_id) references item(id),
+    foreign key (rank_id) references rank(id)
+);
 
 create view if not exists itemmechanic as
 select item_link.item_id, group_concat(link.value, ', ') as value from item_link
@@ -106,6 +129,18 @@ select
     item.minplaytime,
     item.maxplaytime,
     item.minage,
+    item.usersrated, 
+    item.average, 
+    item.bayesaverage, 
+    item.stddev, 
+    item.median, 
+    item.owned, 
+    item.trading, 
+    item.wanting, 
+    item.wishing, 
+    item.numcomments, 
+    item.numweights, 
+    item.averageweight,
     itemmechanic.value as mechanics,
     itemfamily.value as families,
     itemcategory.value as categories
