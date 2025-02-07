@@ -108,9 +108,17 @@ join link on link.id == item_link.link_id
 where link.link_type="boardgamecategory"
 group by item_link.item_id;
 
+create view if not exists _result_best_numplayers as
+select r.poll_id, numplayers, max(r.numvotes) as numvotes from result r where r.poll_name ='suggested_numplayers' and r.value = 'Best' group by poll_id
 
 -- TODO: consolidate polls
 -- select * from result where poll_id = 178900
+
+-- select boardgame.id,boardgame.name, result.* from boardgame 
+-- join result on boardgame.id = result.poll_id 
+-- and result.numplayers = (select result.numplayers from result where result.poll_id = boardgame.id and result.poll_name = 'suggested_numplayers' and result.value = 'Best' order by result.numvotes desc limit 1)
+-- where result.value = 'Best' and result.poll_name = 'suggested_numplayers' 
+-- order by numvotes desc
 
 create view if not exists boardgame as
 select
