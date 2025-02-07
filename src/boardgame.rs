@@ -133,7 +133,7 @@ pub struct ResultsResult {
     #[serde(rename = "@value")]
     pub value: String,
     #[serde(rename = "@numvotes")]
-    pub numvotes: String,
+    pub numvotes: i64,
     #[serde(rename = "@level")]
     pub level: Option<String>,
 }

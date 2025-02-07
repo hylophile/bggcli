@@ -38,30 +38,23 @@ CREATE TABLE IF NOT EXISTS itemname (
 );
 
 CREATE TABLE IF NOT EXISTS poll (
-    id INTEGER PRIMARY KEY,
     item_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     title TEXT NOT NULL,
     totalvotes INTEGER NOT NULL,
-    text TEXT,
+    PRIMARY KEY (item_id, name),
     FOREIGN KEY (item_id) REFERENCES item(id)
 );
 
-CREATE TABLE IF NOT EXISTS results (
-    id INTEGER PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS result (
     poll_id INTEGER NOT NULL,
+    poll_name TEXT NOT NULL,
     numplayers TEXT,
-    text TEXT,
-    FOREIGN KEY (poll_id) REFERENCES poll(id)
-);
-
-CREATE TABLE IF NOT EXISTS resultsresult (
-    id INTEGER PRIMARY KEY,
-    results_id INTEGER NOT NULL,
     value TEXT NOT NULL,
-    numvotes TEXT NOT NULL,
+    numvotes INTEGER NOT NULL,
     level TEXT,
-    FOREIGN KEY (results_id) REFERENCES results(id)
+    PRIMARY KEY (poll_id, poll_name, numplayers, value, level),
+    FOREIGN KEY (poll_id, poll_name) REFERENCES poll(item_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS link (
@@ -116,7 +109,9 @@ where link.link_type="boardgamecategory"
 group by item_link.item_id;
 
 
--- todo
+-- TODO: consolidate polls
+-- select * from result where poll_id = 178900
+
 create view if not exists boardgame as
 select
     item.id,

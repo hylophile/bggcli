@@ -56,11 +56,31 @@ pub async fn boardgames_insert(
                    link_id
                ) VALUES ",
     );
+    let mut poll_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "INSERT OR REPLACE INTO poll (
+                   item_id,
+                   name,
+                   title,
+                   totalvotes
+               ) VALUES ",
+    );
+    let mut result_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "INSERT OR REPLACE INTO result (
+                   poll_id,
+                   poll_name,
+                   numplayers,
+                   value,
+                   numvotes,
+                   level
+               ) VALUES ",
+    );
 
     // TODO: feels very dumb, but it works
     let mut is_first_link = true;
     let mut is_first_item_link = true;
     let mut is_first_itemname = true;
+    let mut is_first_poll = true;
+    let mut is_first_result = true;
 
     item_query_builder.push_values(boardgames, |mut item_qb, item| {
         let stats = item.statistics.ratings;
@@ -132,6 +152,45 @@ pub async fn boardgames_insert(
             separated.push_unseparated(")");
             is_first_itemname = false;
         }
+
+        for poll in item.poll.iter() {
+            if !is_first_poll {
+                poll_query_builder.push(", ");
+            }
+            poll_query_builder.push("(");
+            let mut separated = poll_query_builder.separated(", ");
+            separated
+                .push_bind(item.id)
+                .push_bind(poll.name.clone())
+                .push_bind(poll.title.clone())
+                .push_bind(poll.totalvotes);
+            separated.push_unseparated(")");
+            is_first_poll = false;
+
+            for results in &poll.results {
+                let num_players = results
+                    .numplayers
+                    .clone()
+                    .and_then(parse_incremented_integer);
+                for result in &results.result {
+                    let level = result.level.clone().and_then(parse_incremented_integer);
+                    if !is_first_result {
+                        result_query_builder.push(", ");
+                    }
+                    result_query_builder.push("(");
+                    let mut separated = result_query_builder.separated(", ");
+                    separated
+                        .push_bind(item.id)
+                        .push_bind(poll.name.clone())
+                        .push_bind(num_players.clone())
+                        .push_bind(result.value.clone())
+                        .push_bind(result.numvotes)
+                        .push_bind(level);
+                    separated.push_unseparated(")");
+                    is_first_result = false;
+                }
+            }
+        }
     });
 
     let q = item_query_builder.build();
@@ -142,6 +201,22 @@ pub async fn boardgames_insert(
     q.execute(pool).await?;
     let q = itemname_query_builder.build();
     q.execute(pool).await?;
+    let q = poll_query_builder.build();
+    q.execute(pool).await?;
+    let q = result_query_builder.build();
+    q.execute(pool).await?;
 
     Ok(())
+}
+// fn parse_level(input: String) -> Result<String, std::num::ParseIntError> {
+fn parse_incremented_integer(input: String) -> Option<String> {
+    if let Some(stripped) = input.strip_suffix('+') {
+        stripped
+            .parse::<i64>()
+            .map(|n| n + 1)
+            .map(|n| n.to_string())
+            .ok() // meh... result would be better?
+    } else {
+        return Some(input.to_string());
+    }
 }
