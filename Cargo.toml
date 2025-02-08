@@ -14,6 +14,7 @@ futures = "0.3.31"
 http-cache-reqwest = "0.15.0"
 indicatif = { version = "0.17.11", features = ["tokio"] }
 quick-xml = { version = "0.37.2", features = ["serialize", "overlapped-lists"] }
+regex = "1.11.1"
 reqwest = "0.12.12"
 reqwest-middleware = "0.4.0"
 # rusqlite = "0.33.0"

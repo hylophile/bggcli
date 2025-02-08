@@ -74,6 +74,15 @@ pub async fn boardgames_insert(
                    level
                ) VALUES ",
     );
+    let mut pollresultsummary_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "INSERT OR REPLACE INTO pollsummaryresult (
+                   item_id,
+                   poll_name,
+                   poll_title,
+                   result_name,
+                   result_value
+               ) VALUES ",
+    );
 
     // TODO: feels very dumb, but it works
     let mut is_first_link = true;
@@ -81,6 +90,7 @@ pub async fn boardgames_insert(
     let mut is_first_itemname = true;
     let mut is_first_poll = true;
     let mut is_first_result = true;
+    let mut is_first_pollresultsummary = true;
 
     item_query_builder.push_values(boardgames, |mut item_qb, item| {
         let stats = item.statistics.ratings;
@@ -190,6 +200,25 @@ pub async fn boardgames_insert(
                     is_first_result = false;
                 }
             }
+
+            let pollsummary_name = item.poll_summary.name.clone();
+            let pollsummary_title = item.poll_summary.title.clone();
+            for psr in item.poll_summary.result.clone().iter() {
+                if !is_first_pollresultsummary {
+                    pollresultsummary_query_builder.push(", ");
+                }
+                pollresultsummary_query_builder.push("(");
+                let mut separated = pollresultsummary_query_builder.separated(", ");
+                let result_value = extract_players(&psr.value);
+                separated
+                    .push_bind(item.id)
+                    .push_bind(pollsummary_name.clone())
+                    .push_bind(pollsummary_title.clone())
+                    .push_bind(psr.name.clone())
+                    .push_bind(result_value);
+                separated.push_unseparated(")");
+                is_first_pollresultsummary = false;
+            }
         }
     });
 
@@ -205,6 +234,8 @@ pub async fn boardgames_insert(
     q.execute(pool).await?;
     let q = result_query_builder.build();
     q.execute(pool).await?;
+    let q = pollresultsummary_query_builder.build();
+    q.execute(pool).await?;
 
     Ok(())
 }
@@ -218,5 +249,16 @@ fn parse_incremented_integer(input: String) -> Option<String> {
             .ok() // meh... result would be better?
     } else {
         return Some(input.to_string());
+    }
+}
+
+fn extract_players(input: &str) -> Option<String> {
+    let pattern = r".+with (.+) players$";
+    let re = regex::Regex::new(pattern).unwrap();
+
+    if let Some(captures) = re.captures(input) {
+        captures.get(1).map(|matched| matched.as_str().to_owned())
+    } else {
+        None
     }
 }

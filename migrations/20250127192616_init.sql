@@ -57,6 +57,16 @@ CREATE TABLE IF NOT EXISTS result (
     FOREIGN KEY (poll_id, poll_name) REFERENCES poll(item_id, name)
 );
 
+CREATE TABLE IF NOT EXISTS pollsummaryresult (
+    item_id INTEGER NOT NULL,
+    poll_name TEXT NOT NULL,
+    poll_title TEXT NOT NULL,
+    result_name TEXT NOT NULL,
+    result_value TEXT,
+    PRIMARY KEY (item_id, poll_name, result_name),
+    FOREIGN KEY (item_id) REFERENCES item(id)
+);
+
 CREATE TABLE IF NOT EXISTS link (
     id INTEGER PRIMARY KEY,
     link_type TEXT NOT NULL,
@@ -109,7 +119,7 @@ where link.link_type="boardgamecategory"
 group by item_link.item_id;
 
 create view if not exists _result_best_numplayers as
-select r.poll_id, numplayers, max(r.numvotes) as numvotes from result r where r.poll_name ='suggested_numplayers' and r.value = 'Best' group by poll_id
+select r.poll_id, numplayers, max(r.numvotes) as numvotes from result r where r.poll_name ='suggested_numplayers' and r.value = 'Best' group by poll_id;
 
 -- TODO: consolidate polls
 -- select * from result where poll_id = 178900
