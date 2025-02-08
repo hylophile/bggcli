@@ -257,7 +257,20 @@ fn extract_players(input: &str) -> Option<String> {
     let re = regex::Regex::new(pattern).unwrap();
 
     if let Some(captures) = re.captures(input) {
-        captures.get(1).map(|matched| matched.as_str().to_owned())
+        let players = captures.get(1).unwrap().as_str();
+        let re = regex::Regex::new(r"(\d+)–(\d+)").unwrap();
+        if let Some(captures) = re.captures(players) {
+            let bottom = captures.get(1).unwrap().as_str().parse::<i64>().unwrap();
+            let top = captures.get(2).unwrap().as_str().parse::<i64>().unwrap();
+            Some(
+                (bottom..=top)
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            )
+        } else {
+            Some(players.to_string())
+        }
     } else {
         None
     }
