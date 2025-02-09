@@ -118,17 +118,16 @@ join link on link.id == item_link.link_id
 where link.link_type="boardgamecategory"
 group by item_link.item_id;
 
-create view if not exists _result_best_numplayers as
-select r.poll_id, numplayers, max(r.numvotes) as numvotes from result r where r.poll_name ='suggested_numplayers' and r.value = 'Best' group by poll_id;
+-- not used anymore
+-- create view if not exists _result_best_numplayers as
+-- select r.poll_id, numplayers, max(r.numvotes) as numvotes from result r where r.poll_name ='suggested_numplayers' and r.value = 'Best' group by poll_id;
 
--- TODO: consolidate polls
--- select * from result where poll_id = 178900
 
--- select boardgame.id,boardgame.name, result.* from boardgame 
--- join result on boardgame.id = result.poll_id 
--- and result.numplayers = (select result.numplayers from result where result.poll_id = boardgame.id and result.poll_name = 'suggested_numplayers' and result.value = 'Best' order by result.numvotes desc limit 1)
--- where result.value = 'Best' and result.poll_name = 'suggested_numplayers' 
--- order by numvotes desc
+create view if not exists poll_bestwith as
+select item_id, result_value from pollsummaryresult psr where psr.result_name = 'bestwith';
+
+create view if not exists poll_recommendedwith as
+select item_id, result_value from pollsummaryresult psr where psr.result_name = 'recommmendedwith';
 
 create view if not exists boardgame as
 select
@@ -138,6 +137,8 @@ select
     item.yearpublished,
     item.minplayers,
     item.maxplayers,
+    poll_bestwith.result_value as poll_bestplayers,
+    poll_recommendedwith.result_value as poll_recommendedplayers,
     item.playingtime,
     item.minplaytime,
     item.maxplaytime,
@@ -162,6 +163,8 @@ left outer join itemname on item.id == itemname.item_id
 left outer join itemmechanic on item.id = itemmechanic.item_id
 left outer join itemfamily on item.id = itemfamily.item_id
 left outer join itemcategory on item.id = itemcategory.item_id
+left outer join poll_bestwith on item.id = poll_bestwith.item_id
+left outer join poll_recommendedwith on item.id = poll_recommendedwith.item_id
 where itemname.name_type == "primary";
 
 --join item_link on link.id == item_link.link_id 
