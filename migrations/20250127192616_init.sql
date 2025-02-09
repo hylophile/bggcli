@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS item (
     wishing INTEGER NOT NULL,
     numcomments INTEGER NOT NULL,
     numweights INTEGER NOT NULL,
-    averageweight REAL NOT NULL
+    averageweight REAL NOT NULL,
+    rank INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS itemname (
@@ -134,11 +135,16 @@ select
     item.id,
     itemname.value as name,
     item.description,
-    item.yearpublished,
+    item.rank,
+    item.averageweight,
     item.minplayers,
     item.maxplayers,
     poll_bestwith.result_value as poll_bestplayers,
     poll_recommendedwith.result_value as poll_recommendedplayers,
+    itemmechanic.value as mechanics,
+    itemfamily.value as families,
+    itemcategory.value as categories,
+    item.yearpublished,
     item.playingtime,
     item.minplaytime,
     item.maxplaytime,
@@ -153,11 +159,7 @@ select
     item.wanting, 
     item.wishing, 
     item.numcomments, 
-    item.numweights, 
-    item.averageweight,
-    itemmechanic.value as mechanics,
-    itemfamily.value as families,
-    itemcategory.value as categories
+    item.numweights 
 from item
 left outer join itemname on item.id == itemname.item_id 
 left outer join itemmechanic on item.id = itemmechanic.item_id

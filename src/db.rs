@@ -31,7 +31,8 @@ pub async fn boardgames_insert(
                     wishing, 
                     numcomments, 
                     numweights, 
-                    averageweight
+                    averageweight,
+                    rank
                ) ",
     );
     let mut itemname_query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
@@ -94,6 +95,15 @@ pub async fn boardgames_insert(
 
     item_query_builder.push_values(boardgames, |mut item_qb, item| {
         let stats = item.statistics.ratings;
+        let rank = stats
+            .ranks
+            .rank
+            .iter()
+            .filter(|r| r.name == "boardgame")
+            .collect::<Vec<_>>()
+            .get(0)
+            .map(|r| (&r.value).parse::<i64>().ok())
+            .flatten();
         item_qb
             .push_bind(item.id)
             .push_bind(item.item_type)
@@ -119,7 +129,8 @@ pub async fn boardgames_insert(
             .push_bind(stats.wishing.value)
             .push_bind(stats.numcomments.value)
             .push_bind(stats.numweights.value)
-            .push_bind(stats.averageweight.value);
+            .push_bind(stats.averageweight.value)
+            .push_bind(rank);
 
         // TODO: add ranks
 
