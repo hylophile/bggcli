@@ -45,6 +45,8 @@ enum Commands {
         /// URL to add
         url: String,
     },
+    /// adds comma-separated ids to the database
+    AddIds { ids: String },
     /// queries the database for items (SQL syntax)
     Query {
         /// add a WHERE-clause (Filter the results)
@@ -112,6 +114,13 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
+        Commands::AddIds { ids } => {
+            let ids = ids
+                .split(",")
+                .filter_map(|id| id.parse::<u32>().ok()) // TODO dont ignore errors
+                .collect();
+            let _ = fetch_boardgame_ids(client, pool, ids).await?;
+        }
         Commands::Add { url } => {
             let (url_type, url_api) = parse_bgg_url(&url)?;
             let resp = client.get(url_api).send().await?.text().await?;
@@ -184,7 +193,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-// const SUPPORTED_TYPES: &[&str] = &["geeklist", "boardgame", "expansion", "family"];
 const SUPPORTED_TYPES: &[&str] = &["geeklist", "collection"];
 
 fn parse_bgg_url(url: &str) -> Result<(BGGAPIURLType, String)> {
