@@ -4,7 +4,7 @@ use futures::TryStreamExt;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use indicatif::{ProgressBar, ProgressStyle};
 use quick_xml::de::from_str;
-use reqwest::Client;
+use reqwest::{Client, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{
     default_on_request_failure, policies::ExponentialBackoff, RetryTransientMiddleware, Retryable,
@@ -16,6 +16,7 @@ use sqlx::{
 use tokio::time::{sleep, Duration};
 
 mod boardgame;
+mod collection;
 mod db;
 mod geeklist;
 
@@ -75,6 +76,11 @@ struct Bleh {
     name: Option<String>,
 }
 
+enum BGGAPIURLType {
+    Collection,
+    Geeklist,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bggcli")?;
@@ -107,29 +113,49 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Add { url } => {
-            let (url_type, id) = parse_bgg_url(&url)?;
-            let url_api = format!("https://boardgamegeek.com/xmlapi2/{url_type}/{id}/");
+            let (url_type, url_api) = parse_bgg_url(&url)?;
             let resp = client.get(url_api).send().await?.text().await?;
 
-            let geeklist = match from_str::<geeklist::Geeklist>(&resp) {
-                Ok(r) => r,
-                Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
-            };
+            let ids = match url_type {
+                BGGAPIURLType::Collection => {
+                    let collection = match from_str::<collection::Items>(&resp) {
+                        Ok(r) => r,
+                        Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
+                    };
+                    collection
+                        .item
+                        .iter()
+                        .map(|it| {
+                            let object_type = &it.objecttype;
+                            let subtype = &it.subtype;
+                            let id = it.objectid;
+                            assert_eq!(object_type, "thing");
+                            assert_eq!(subtype, "boardgame");
+                            id
+                        })
+                        .collect::<Vec<u32>>()
+                }
+                BGGAPIURLType::Geeklist => {
+                    let geeklist = match from_str::<geeklist::Geeklist>(&resp) {
+                        Ok(r) => r,
+                        Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
+                    };
 
-            let ids = geeklist
-                .item
-                .iter()
-                .map(|it| {
-                    let object_type = &it.object_type;
-                    let subtype = &it.subtype;
-                    let id = it.object_id;
-                    assert_eq!(object_type, "thing");
-                    assert_eq!(subtype, "boardgame");
-                    // return (&it.object_name, id);
-                    id
-                })
-                .collect::<Vec<u32>>();
-            let _ = fetch_geeklist(client, pool, ids).await?;
+                    geeklist
+                        .item
+                        .iter()
+                        .map(|it| {
+                            let object_type = &it.object_type;
+                            let subtype = &it.subtype;
+                            let id = it.object_id;
+                            assert_eq!(object_type, "thing");
+                            assert_eq!(subtype, "boardgame");
+                            id
+                        })
+                        .collect::<Vec<u32>>()
+                }
+            };
+            let _ = fetch_boardgame_ids(client, pool, ids).await?;
         }
         Commands::Query { r#where, columns } => {
             let filter = r#where.unwrap_or("true".to_string());
@@ -159,9 +185,9 @@ async fn main() -> Result<()> {
 }
 
 // const SUPPORTED_TYPES: &[&str] = &["geeklist", "boardgame", "expansion", "family"];
-const SUPPORTED_TYPES: &[&str] = &["geeklist"];
+const SUPPORTED_TYPES: &[&str] = &["geeklist", "collection"];
 
-fn parse_bgg_url(url: &str) -> Result<(String, String)> {
+fn parse_bgg_url(url: &str) -> Result<(BGGAPIURLType, String)> {
     if !url.starts_with("https://boardgamegeek.com/") {
         return Err(anyhow!(
             "Invalid domain: Only 'boardgamegeek.com' URLs are supported"
@@ -169,17 +195,30 @@ fn parse_bgg_url(url: &str) -> Result<(String, String)> {
     }
 
     let path = url.trim_start_matches("https://boardgamegeek.com/");
-    let mut parts = path.split('/');
-    if let (Some(type_part), Some(id_part)) = (parts.next(), parts.next()) {
-        if !SUPPORTED_TYPES.contains(&type_part) {
+    match path.split('/').collect::<Vec<_>>().as_slice() {
+        ["geeklist", id, ..] => {
+            if id.chars().all(char::is_numeric) {
+                return Ok((
+                    BGGAPIURLType::Geeklist,
+                    format!("https://boardgamegeek.com/xmlapi2/geeklist/{id}/"),
+                ));
+            }
+        }
+        ["collection", "user", username, ..] => {
+            return Ok((
+                BGGAPIURLType::Collection,
+                format!("https://boardgamegeek.com/xmlapi2/collection?username={username}"),
+            ));
+        }
+        [type_part, ..] => {
             return Err(anyhow!(
                 "Unsupported type '{}'. Supported types: {:?}",
                 type_part,
                 SUPPORTED_TYPES
             ));
         }
-        if id_part.chars().all(char::is_numeric) {
-            return Ok((type_part.to_string(), id_part.to_string()));
+        _ => {
+            return Err(anyhow!("Unknown url given"));
         }
     }
 
@@ -188,7 +227,7 @@ fn parse_bgg_url(url: &str) -> Result<(String, String)> {
     ))
 }
 
-async fn fetch_geeklist(
+async fn fetch_boardgame_ids(
     client: ClientWithMiddleware,
     pool: Pool<Sqlite>,
     ids: Vec<u32>,
