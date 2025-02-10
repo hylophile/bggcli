@@ -1,15 +1,19 @@
 use anyhow::{anyhow, Result};
-use boardgame::Item;
+use clap::{Parser, Subcommand};
+use futures::TryStreamExt;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use indicatif::{ProgressBar, ProgressStyle};
 use quick_xml::de::from_str;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use sqlx::{prelude::FromRow, sqlite::SqliteConnectOptions, QueryBuilder, Row, Sqlite, SqlitePool};
+use reqwest_retry::{
+    default_on_request_failure, policies::ExponentialBackoff, RetryTransientMiddleware, Retryable,
+    RetryableStrategy,
+};
+use sqlx::{
+    prelude::FromRow, sqlite::SqliteConnectOptions, Pool, QueryBuilder, Sqlite, SqlitePool,
+};
 use tokio::time::{sleep, Duration};
-
-use clap::{Parser, Subcommand};
-use futures::TryStreamExt;
 
 mod boardgame;
 mod db;
@@ -84,6 +88,7 @@ async fn main() -> Result<()> {
     .await?;
     sqlx::migrate!().run(&pool).await?;
 
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
     let client = ClientBuilder::new(Client::new())
         .with(Cache(HttpCache {
             mode: CacheMode::ForceCache, // prefer local version TODO: make configurable
@@ -93,6 +98,10 @@ async fn main() -> Result<()> {
             },
             options: HttpCacheOptions::default(),
         }))
+        .with(RetryTransientMiddleware::new_with_policy_and_strategy(
+            retry_policy,
+            Retry202,
+        ))
         .build();
 
     let cli = Cli::parse();
@@ -100,9 +109,27 @@ async fn main() -> Result<()> {
         Commands::Add { url } => {
             let (url_type, id) = parse_bgg_url(&url)?;
             let url_api = format!("https://boardgamegeek.com/xmlapi2/{url_type}/{id}/");
-            let boardgames = fetch_geeklist(client, &url_api).await?;
-            println!("Adding {} items to database...", boardgames.len());
-            db::boardgames_insert(&pool, boardgames).await?;
+            let resp = client.get(url_api).send().await?.text().await?;
+
+            let geeklist = match from_str::<geeklist::Geeklist>(&resp) {
+                Ok(r) => r,
+                Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
+            };
+
+            let ids = geeklist
+                .item
+                .iter()
+                .map(|it| {
+                    let object_type = &it.object_type;
+                    let subtype = &it.subtype;
+                    let id = it.object_id;
+                    assert_eq!(object_type, "thing");
+                    assert_eq!(subtype, "boardgame");
+                    // return (&it.object_name, id);
+                    id
+                })
+                .collect::<Vec<u32>>();
+            let _ = fetch_geeklist(client, pool, ids).await?;
         }
         Commands::Query { r#where, columns } => {
             let filter = r#where.unwrap_or("true".to_string());
@@ -161,39 +188,25 @@ fn parse_bgg_url(url: &str) -> Result<(String, String)> {
     ))
 }
 
-async fn fetch_geeklist(client: ClientWithMiddleware, url: &str) -> Result<Vec<Item>> {
-    let resp = client.get(url).send().await?.text().await?;
-
-    let geeklist = from_str::<geeklist::Geeklist>(&resp)?;
-
-    let boardgame_ids = geeklist
-        .item
-        .iter()
-        .map(|it| {
-            let object_type = &it.object_type;
-            let subtype = &it.subtype;
-            let id = it.object_id;
-            assert_eq!(object_type, "thing");
-            assert_eq!(subtype, "boardgame");
-            return (&it.object_name, id);
-        })
-        .collect::<Vec<(&String, u32)>>();
-
-    let mut boardgames: Vec<boardgame::Item> = Vec::with_capacity(boardgame_ids.len());
-
-    let progress_bar_fetch = ProgressBar::new(boardgame_ids.len() as u64);
+async fn fetch_geeklist(
+    client: ClientWithMiddleware,
+    pool: Pool<Sqlite>,
+    ids: Vec<u32>,
+) -> Result<()> {
+    let progress_bar_fetch = ProgressBar::new(ids.len() as u64);
     progress_bar_fetch.set_style(
         ProgressStyle::with_template("{elapsed:>4} [{bar:40}] {percent}% {msg}")
             .unwrap()
             .progress_chars("-Co"),
     );
 
-    println!("Fetching {} items...", boardgame_ids.len());
+    println!("Fetching & adding {} items...", ids.len());
 
-    for chunk in boardgame_ids.chunks(20) {
+    for chunk in ids.chunks(20) {
+        let mut boardgames: Vec<boardgame::Item> = Vec::with_capacity(ids.len());
         let ids = chunk
             .iter()
-            .map(|(_, id)| id.to_string())
+            .map(|id| id.to_string())
             .collect::<Vec<String>>()
             .join(",");
 
@@ -241,11 +254,31 @@ async fn fetch_geeklist(client: ClientWithMiddleware, url: &str) -> Result<Vec<I
                 }
             }
         }
-        if !resp_was_cached {
-            sleep(Duration::from_secs(1)).await;
-        }
+        let task_wait = tokio::spawn(async move {
+            if !resp_was_cached {
+                sleep(Duration::from_secs(1)).await;
+            }
+        });
+
+        let tpool = pool.clone();
+        let task_add = tokio::spawn(async move { db::boardgames_insert(&tpool, boardgames).await });
+
+        let _ = tokio::try_join!(task_wait, task_add)?;
     }
     progress_bar_fetch.finish();
+    Ok(())
+}
 
-    return Ok(boardgames);
+struct Retry202;
+impl RetryableStrategy for Retry202 {
+    fn handle(&self, res: &reqwest_middleware::Result<reqwest::Response>) -> Option<Retryable> {
+        match res {
+            // retry if 202
+            Ok(success) if success.status() == 202 => Some(Retryable::Transient),
+            // otherwise do not retry a successful request
+            Ok(_) => None,
+            // but maybe retry a request failure
+            Err(error) => default_on_request_failure(error),
+        }
+    }
 }

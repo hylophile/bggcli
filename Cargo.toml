@@ -17,6 +17,7 @@ quick-xml = { version = "0.37.2", features = ["serialize", "overlapped-lists"] }
 regex = "1.11.1"
 reqwest = "0.12.12"
 reqwest-middleware = "0.4.0"
+reqwest-retry = "0.7.0"
 # rusqlite = "0.33.0"
 serde = { version = "1.0.217", features = ["derive"] }
 # serde_rusqlite = "0.37.0"

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub struct Geeklist {
@@ -19,6 +20,7 @@ pub struct Geeklist {
     pub item: Vec<Item>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub struct Item {
