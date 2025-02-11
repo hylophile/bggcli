@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
+use clap_stdin::MaybeStdin;
 use futures::TryStreamExt;
 use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -14,7 +15,6 @@ use sqlx::{
     prelude::FromRow, sqlite::SqliteConnectOptions, Pool, QueryBuilder, Sqlite, SqlitePool,
 };
 use tokio::time::{sleep, Duration};
-
 mod boardgame;
 mod collection;
 mod db;
@@ -40,14 +40,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// adds items to the database
-    Add {
-        /// URL to add
-        url: String,
-    },
-    /// adds comma-separated ids to the database
-    AddIds { ids: String },
-    /// queries the database for items (SQL syntax)
+    /// Add whitespace-separated URLs to the database.
+    /// Use - as argument if you're passing in urls via STDIN.
+    /// Supported types: geeklist, collection
+    #[clap(verbatim_doc_comment)]
+    Add { url: MaybeStdin<String> },
+    /// Add whitespace-separated boardgame ids to the database.
+    /// Use - as argument if you're passing in ids via STDIN.
+    #[clap(verbatim_doc_comment)]
+    AddIds { ids: MaybeStdin<String> },
+    /// Query the database for items (SQL syntax).
     Query {
         /// add a WHERE-clause (Filter the results)
         #[arg(short, long)]
@@ -56,6 +58,7 @@ enum Commands {
         #[arg(short, long)]
         columns: Option<String>,
     },
+    /// Database-related commands.
     Db {
         #[command(subcommand)]
         subcommand: DbCommands,
@@ -115,56 +118,18 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::AddIds { ids } => {
-            let ids = ids
-                .split(",")
+            let ids: Vec<u32> = ids
+                .split_whitespace()
                 .filter_map(|id| id.parse::<u32>().ok()) // TODO dont ignore errors
                 .collect();
-            let _ = fetch_boardgame_ids(client, pool, ids).await?;
+            // let _ = fetch_boardgame_ids(client, pool, ids).await?;
+            println!("{:?}", ids);
         }
-        Commands::Add { url } => {
-            let (url_type, url_api) = parse_bgg_url(&url)?;
-            let resp = client.get(url_api).send().await?.text().await?;
-
-            let ids = match url_type {
-                BGGAPIURLType::Collection => {
-                    let collection = match from_str::<collection::Items>(&resp) {
-                        Ok(r) => r,
-                        Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
-                    };
-                    collection
-                        .item
-                        .iter()
-                        .map(|it| {
-                            let object_type = &it.objecttype;
-                            let subtype = &it.subtype;
-                            let id = it.objectid;
-                            assert_eq!(object_type, "thing");
-                            assert_eq!(subtype, "boardgame");
-                            id
-                        })
-                        .collect::<Vec<u32>>()
-                }
-                BGGAPIURLType::Geeklist => {
-                    let geeklist = match from_str::<geeklist::Geeklist>(&resp) {
-                        Ok(r) => r,
-                        Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
-                    };
-
-                    geeklist
-                        .item
-                        .iter()
-                        .map(|it| {
-                            let object_type = &it.object_type;
-                            let subtype = &it.subtype;
-                            let id = it.object_id;
-                            assert_eq!(object_type, "thing");
-                            assert_eq!(subtype, "boardgame");
-                            id
-                        })
-                        .collect::<Vec<u32>>()
-                }
-            };
-            let _ = fetch_boardgame_ids(client, pool, ids).await?;
+        Commands::Add { url: urls } => {
+            let urls = urls.split_whitespace();
+            for url in urls {
+                add_url(client.clone(), pool.clone(), url).await?;
+            }
         }
         Commands::Query { r#where, columns } => {
             let filter = r#where.unwrap_or("true".to_string());
@@ -189,6 +154,54 @@ async fn main() -> Result<()> {
             }
         },
     };
+
+    Ok(())
+}
+
+async fn add_url(client: ClientWithMiddleware, pool: Pool<Sqlite>, url: &str) -> Result<()> {
+    let (url_type, url_api) = parse_bgg_url(url)?;
+    let resp = client.get(url_api).send().await?.text().await?;
+
+    let ids = match url_type {
+        BGGAPIURLType::Collection => {
+            let collection = match from_str::<collection::Items>(&resp) {
+                Ok(r) => r,
+                Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
+            };
+            collection
+                .item
+                .iter()
+                .map(|it| {
+                    let object_type = &it.objecttype;
+                    let subtype = &it.subtype;
+                    let id = it.objectid;
+                    assert_eq!(object_type, "thing");
+                    assert_eq!(subtype, "boardgame");
+                    id
+                })
+                .collect::<Vec<u32>>()
+        }
+        BGGAPIURLType::Geeklist => {
+            let geeklist = match from_str::<geeklist::Geeklist>(&resp) {
+                Ok(r) => r,
+                Err(e) => panic!("{}\n\n\ndocument:\n{}", e.to_string(), resp),
+            };
+
+            geeklist
+                .item
+                .iter()
+                .map(|it| {
+                    let object_type = &it.object_type;
+                    let subtype = &it.subtype;
+                    let id = it.object_id;
+                    assert_eq!(object_type, "thing");
+                    assert_eq!(subtype, "boardgame");
+                    id
+                })
+                .collect::<Vec<u32>>()
+        }
+    };
+    let _ = fetch_boardgame_ids(client, pool, ids).await?;
 
     Ok(())
 }
