@@ -94,6 +94,9 @@ async fn main() -> Result<()> {
     let pool = SqlitePool::connect_with(
         SqliteConnectOptions::new()
             .filename(db_file.to_str().expect("unknown error"))
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+            .page_size(6144000)
             .create_if_missing(true),
     )
     .await?;
@@ -122,8 +125,7 @@ async fn main() -> Result<()> {
                 .split_whitespace()
                 .filter_map(|id| id.parse::<u32>().ok()) // TODO dont ignore errors
                 .collect();
-            // let _ = fetch_boardgame_ids(client, pool, ids).await?;
-            println!("{:?}", ids);
+            let _ = fetch_boardgame_ids(client, pool, ids).await?;
         }
         Commands::Add { url: urls } => {
             let urls = urls.split_whitespace();
